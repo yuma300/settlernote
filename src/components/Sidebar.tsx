@@ -197,9 +197,6 @@ export function Sidebar({
             <Typography variant="body2" noWrap>
               {session?.user?.name}
             </Typography>
-            <Typography variant="caption" color="text.secondary" noWrap>
-              {session?.user?.email}
-            </Typography>
           </Box>
         </Box>
         <Menu
@@ -243,6 +240,20 @@ export function Sidebar({
             />
           ))}
         </List>
+      </Box>
+
+      <Divider />
+
+      {/* Settings Button */}
+      <Box sx={{ p: 2 }}>
+        <Button
+          fullWidth
+          variant="outlined"
+          startIcon={<Settings />}
+          onClick={() => router.push('/settings')}
+        >
+          ユーザー設定
+        </Button>
       </Box>
     </Drawer>
   )

@@ -11,12 +11,19 @@ import {
   CircularProgress,
   Stack,
   Chip,
+  List,
+  ListItem,
+  ListItemButton,
+  ListItemIcon,
+  ListItemText,
+  Divider as MuiDivider,
 } from '@mui/material'
-import { Save, Share, Delete, EmojiEmotions } from '@mui/icons-material'
+import { Save, Share, Delete, EmojiEmotions, Description, FolderOpen, Toc } from '@mui/icons-material'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/Sidebar'
-import { Editor } from '@/components/Editor'
+import { NovelEditorComponent } from '@/components/NovelEditor'
+import { TableOfContents } from '@/components/TableOfContents'
 import EmojiPicker from 'emoji-picker-react'
 
 interface Document {
@@ -49,6 +56,10 @@ export default function DocumentsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [showEmojiPicker, setShowEmojiPicker] = useState(false)
+  const [autoSaving, setAutoSaving] = useState(false)
+  const [lastSaved, setLastSaved] = useState<Date | null>(null)
+  const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [showToc, setShowToc] = useState(false)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -85,6 +96,8 @@ export default function DocumentsPage() {
       if (response.ok) {
         const data = await response.json()
         setCurrentDoc(data)
+        setIsInitialLoad(true) // 新しいドキュメントを読み込んだ時はフラグをリセット
+        setLastSaved(null) // 保存ステータスをリセット
       }
     } catch (error) {
       console.error('Error fetching document:', error)
@@ -107,6 +120,8 @@ export default function DocumentsPage() {
         const newDoc = await response.json()
         await fetchDocuments()
         setCurrentDoc(newDoc)
+        setIsInitialLoad(true) // 新規ドキュメント作成時もフラグをリセット
+        setLastSaved(null) // 保存ステータスをリセット
       }
     } catch (error) {
       console.error('Error creating document:', error)
@@ -159,16 +174,47 @@ export default function DocumentsPage() {
     }
   }
 
-  // Auto-save on content change (debounced)
+  // 自動保存機能
   useEffect(() => {
     if (!currentDoc) return
 
-    const timeoutId = setTimeout(() => {
-      handleSaveDocument()
-    }, 1000)
+    // 初回ロード時は保存しない
+    if (isInitialLoad) {
+      setIsInitialLoad(false)
+      return
+    }
 
-    return () => clearTimeout(timeoutId)
-  }, [currentDoc?.title, currentDoc?.content, currentDoc?.icon])
+    setAutoSaving(true)
+    const autoSaveTimer = setTimeout(async () => {
+      try {
+        const response = await fetch(`/api/documents/${currentDoc.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: currentDoc.title,
+            icon: currentDoc.icon,
+            content: currentDoc.content,
+          }),
+        })
+
+        if (response.ok) {
+          setLastSaved(new Date())
+          console.log('Auto-saved successfully')
+        } else {
+          console.error('Auto-save failed:', response.status)
+        }
+      } catch (error) {
+        console.error('Auto-save error:', error)
+      } finally {
+        setAutoSaving(false)
+      }
+    }, 2000) // 2秒後に自動保存
+
+    return () => {
+      clearTimeout(autoSaveTimer)
+      setAutoSaving(false)
+    }
+  }, [currentDoc?.title, currentDoc?.content, currentDoc?.icon, currentDoc?.id, isInitialLoad])
 
   if (status === 'loading' || loading) {
     return (
@@ -259,7 +305,7 @@ export default function DocumentsPage() {
               </Stack>
 
               {/* Toolbar */}
-              <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+              <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
                 <IconButton
                   onClick={handleSaveDocument}
                   disabled={saving}
@@ -270,17 +316,53 @@ export default function DocumentsPage() {
                 <IconButton color="primary">
                   <Share />
                 </IconButton>
+                <IconButton
+                  onClick={() => setShowToc(!showToc)}
+                  color={showToc ? 'primary' : 'default'}
+                  title="目次を表示/非表示"
+                >
+                  <Toc />
+                </IconButton>
                 <IconButton onClick={handleDeleteDocument} color="error">
                   <Delete />
                 </IconButton>
+
+                {/* Auto-save status */}
+                <Box sx={{ ml: 'auto' }}>
+                  {autoSaving ? (
+                    <Chip
+                      size="small"
+                      label="保存中..."
+                      color="default"
+                      icon={<CircularProgress size={16} />}
+                    />
+                  ) : lastSaved ? (
+                    <Chip
+                      size="small"
+                      label={`保存済み ${lastSaved.toLocaleTimeString()}`}
+                      color="success"
+                      variant="outlined"
+                    />
+                  ) : null}
+                </Box>
               </Stack>
 
+              {/* Table of Contents */}
+              {showToc && currentDoc.content && (
+                <Box sx={{ mb: 3 }}>
+                  <TableOfContents content={currentDoc.content} />
+                </Box>
+              )}
+
               {/* Editor */}
-              <Editor
+              <NovelEditorComponent
+                key={currentDoc.id}
                 content={currentDoc.content}
                 onChange={(content) =>
                   setCurrentDoc({ ...currentDoc, content })
                 }
+                children={currentDoc.children}
+                onChildClick={fetchDocument}
               />
             </Paper>
           </Container>

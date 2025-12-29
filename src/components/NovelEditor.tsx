@@ -1,0 +1,373 @@
+'use client'
+
+import {
+  EditorRoot,
+  EditorContent,
+  EditorCommand,
+  EditorCommandItem,
+  EditorCommandEmpty,
+  EditorCommandList,
+  EditorBubble,
+  EditorBubbleItem,
+  type JSONContent,
+} from 'novel'
+import { useEditor } from 'novel'
+import { defaultExtensions, suggestionItems } from './novel-extensions'
+import { Paper, IconButton, Divider, Tooltip, Box, Typography, Card, CardActionArea, Stack, Button } from '@mui/material'
+import FormatBoldIcon from '@mui/icons-material/FormatBold'
+import FormatItalicIcon from '@mui/icons-material/FormatItalic'
+import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined'
+import StrikethroughSIcon from '@mui/icons-material/StrikethroughS'
+import CodeIcon from '@mui/icons-material/Code'
+import { Description, FolderOpen, AddLink, DragIndicator } from '@mui/icons-material'
+import { useState, useEffect } from 'react'
+
+interface Document {
+  id: string
+  title: string
+  icon?: string | null
+}
+
+interface NovelEditorComponentProps {
+  content?: any
+  onChange?: (content: any) => void
+  editable?: boolean
+  children?: Document[]
+  onChildClick?: (id: string) => void
+}
+
+export function NovelEditorComponent({
+  content,
+  onChange,
+  editable = true,
+  children,
+  onChildClick,
+}: NovelEditorComponentProps) {
+  const [editorInstance, setEditorInstance] = useState<any>(null)
+
+  // 子ドキュメントへのリンクをエディターに挿入
+  const insertChildLink = (child: Document) => {
+    if (!editorInstance) return
+
+    const linkText = `${child.icon || '📄'} ${child.title}`
+
+    editorInstance
+      .chain()
+      .focus()
+      .insertContent({
+        type: 'text',
+        marks: [
+          {
+            type: 'link',
+            attrs: {
+              href: `#doc-${child.id}`,
+              target: '_self',
+              class: 'child-document-link',
+            },
+          },
+          {
+            type: 'bold',
+          },
+        ],
+        text: linkText,
+      })
+      .insertContent(' ')
+      .run()
+  }
+
+  // ドラッグ開始時のハンドラー
+  const handleDragStart = (e: React.DragEvent, child: Document) => {
+    e.dataTransfer.effectAllowed = 'copy'
+    e.dataTransfer.setData('application/json', JSON.stringify(child))
+  }
+
+  // グローバルクリックハンドラーで子ドキュメントリンクを処理
+  useEffect(() => {
+    const handleClick = (e: MouseEvent) => {
+      const target = e.target as HTMLElement
+
+      // リンク要素またはその親を探す
+      let linkElement: HTMLElement | null = target
+      while (linkElement && linkElement.tagName !== 'A') {
+        linkElement = linkElement.parentElement
+      }
+
+      if (linkElement && linkElement.tagName === 'A') {
+        const href = linkElement.getAttribute('href')
+        if (href && href.startsWith('#doc-') && linkElement.classList.contains('child-document-link')) {
+          e.preventDefault()
+          e.stopPropagation()
+          const docId = href.replace('#doc-', '')
+          console.log('Navigating to document:', docId)
+          onChildClick?.(docId)
+        }
+      }
+    }
+
+    document.addEventListener('click', handleClick, true)
+    return () => {
+      document.removeEventListener('click', handleClick, true)
+    }
+  }, [onChildClick])
+
+  return (
+    <Paper
+      elevation={2}
+      sx={{
+        p: 3,
+        minHeight: '500px',
+        backgroundColor: '#fff',
+        borderRadius: 2,
+        '&:hover': {
+          boxShadow: 4,
+        },
+      }}
+    >
+      <Box
+        onDragOver={(e) => {
+          e.preventDefault()
+          e.dataTransfer.dropEffect = 'copy'
+        }}
+        onDrop={(e) => {
+          e.preventDefault()
+          const data = e.dataTransfer.getData('application/json')
+          if (data) {
+            try {
+              const child = JSON.parse(data) as Document
+              insertChildLink(child)
+            } catch (error) {
+              console.error('Failed to parse dropped data:', error)
+            }
+          }
+        }}
+      >
+        <EditorRoot>
+          <EditorContent
+            extensions={defaultExtensions}
+            initialContent={content}
+            onUpdate={({ editor }) => {
+              if (onChange) {
+                onChange(editor.getJSON())
+              }
+            }}
+            onCreate={({ editor }) => {
+              setEditorInstance(editor)
+            }}
+            editable={editable}
+            immediatelyRender={false}
+            editorProps={{
+              attributes: {
+                class: 'prose prose-lg max-w-full focus:outline-none min-h-96 p-4',
+              },
+            }}
+          >
+          {/* Bubble Menu - 文字選択時に表示 */}
+          <EditorBubble>
+            <Paper
+              elevation={8}
+              sx={{
+                display: 'flex',
+                gap: 0.5,
+                p: 0.5,
+                borderRadius: 1.5,
+              }}
+            >
+              <EditorBubbleItem
+                onSelect={(editor) => editor.chain().focus().toggleBold().run()}
+              >
+                <Tooltip title="太字" arrow>
+                  <IconButton size="small" color="primary">
+                    <FormatBoldIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </EditorBubbleItem>
+
+              <EditorBubbleItem
+                onSelect={(editor) => editor.chain().focus().toggleItalic().run()}
+              >
+                <Tooltip title="斜体" arrow>
+                  <IconButton size="small" color="primary">
+                    <FormatItalicIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </EditorBubbleItem>
+
+              <EditorBubbleItem
+                onSelect={(editor) => editor.chain().focus().toggleUnderline().run()}
+              >
+                <Tooltip title="下線" arrow>
+                  <IconButton size="small" color="primary">
+                    <FormatUnderlinedIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </EditorBubbleItem>
+
+              <Divider orientation="vertical" flexItem sx={{ mx: 0.5 }} />
+
+              <EditorBubbleItem
+                onSelect={(editor) => editor.chain().focus().toggleStrike().run()}
+              >
+                <Tooltip title="取り消し線" arrow>
+                  <IconButton size="small" color="primary">
+                    <StrikethroughSIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </EditorBubbleItem>
+
+              <EditorBubbleItem
+                onSelect={(editor) => editor.chain().focus().toggleCode().run()}
+              >
+                <Tooltip title="コード" arrow>
+                  <IconButton size="small" color="primary">
+                    <CodeIcon fontSize="small" />
+                  </IconButton>
+                </Tooltip>
+              </EditorBubbleItem>
+            </Paper>
+          </EditorBubble>
+
+          {/* Slash Command Menu */}
+          <EditorCommand>
+            <Paper
+              elevation={6}
+              sx={{
+                maxHeight: '320px',
+                overflowY: 'auto',
+                borderRadius: 2,
+                border: '1px solid',
+                borderColor: 'divider',
+              }}
+            >
+              <Box sx={{ p: 1 }}>
+                <EditorCommandEmpty sx={{ px: 2, py: 1, color: 'text.secondary' }}>
+                  コマンドが見つかりません
+                </EditorCommandEmpty>
+                <EditorCommandList>
+                  {suggestionItems.map((item) => (
+                    <EditorCommandItem
+                      key={item.title}
+                      value={item.title}
+                      onCommand={(val) => item.command({ editor: val.editor, range: val.range })}
+                      className="flex items-center gap-2 px-3 py-2 text-sm rounded hover:bg-gray-100 cursor-pointer transition-colors"
+                    >
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+                        <Box sx={{ fontSize: '1.2rem', minWidth: '24px', textAlign: 'center' }}>
+                          {item.icon}
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Box sx={{ fontWeight: 600, color: 'text.primary' }}>{item.title}</Box>
+                          <Box sx={{ fontSize: '0.75rem', color: 'text.secondary' }}>{item.description}</Box>
+                        </Box>
+                      </Box>
+                    </EditorCommandItem>
+                  ))}
+                </EditorCommandList>
+              </Box>
+            </Paper>
+          </EditorCommand>
+        </EditorContent>
+      </EditorRoot>
+      </Box>
+
+      {/* Child Documents - エディタ内に表示 */}
+      {children && children.length > 0 && (
+        <Box sx={{ mt: 4, pt: 3, borderTop: '2px solid', borderColor: 'divider' }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 2 }}>
+            <FolderOpen sx={{ color: 'text.secondary' }} />
+            <Typography variant="h6" color="text.secondary">
+              サブページ
+            </Typography>
+          </Stack>
+          <Box
+            sx={{
+              display: 'grid',
+              gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))',
+              gap: 2,
+            }}
+          >
+            {children.map((child) => (
+              <Card
+                key={child.id}
+                elevation={1}
+                draggable
+                onDragStart={(e) => handleDragStart(e, child)}
+                sx={{
+                  transition: 'all 0.2s',
+                  cursor: 'grab',
+                  '&:active': {
+                    cursor: 'grabbing',
+                  },
+                  '&:hover': {
+                    elevation: 4,
+                    transform: 'translateY(-2px)',
+                    boxShadow: 3,
+                  },
+                }}
+              >
+                <Box sx={{ position: 'relative' }}>
+                  {/* ドラッグインジケーター */}
+                  <Box
+                    sx={{
+                      position: 'absolute',
+                      top: 8,
+                      right: 8,
+                      color: 'text.secondary',
+                      opacity: 0.5,
+                      zIndex: 1,
+                    }}
+                  >
+                    <DragIndicator fontSize="small" />
+                  </Box>
+
+                  <CardActionArea
+                    onClick={() => onChildClick?.(child.id)}
+                    sx={{ p: 2, pb: 1 }}
+                  >
+                    <Stack direction="row" spacing={1.5} alignItems="center">
+                      {child.icon ? (
+                        <Typography variant="h5">{child.icon}</Typography>
+                      ) : (
+                        <Description color="action" />
+                      )}
+                      <Typography
+                        variant="body1"
+                        fontWeight={500}
+                        sx={{
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                          flex: 1,
+                        }}
+                      >
+                        {child.title}
+                      </Typography>
+                    </Stack>
+                  </CardActionArea>
+
+                  {/* リンク挿入ボタン */}
+                  <Box sx={{ px: 2, pb: 1.5 }}>
+                    <Button
+                      size="small"
+                      startIcon={<AddLink />}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        insertChildLink(child)
+                      }}
+                      sx={{
+                        textTransform: 'none',
+                        fontSize: '0.75rem',
+                        color: 'primary.main',
+                      }}
+                    >
+                      本文にリンクを挿入
+                    </Button>
+                  </Box>
+                </Box>
+              </Card>
+            ))}
+          </Box>
+        </Box>
+      )}
+    </Paper>
+  )
+}
