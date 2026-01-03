@@ -19,8 +19,8 @@ import FormatItalicIcon from '@mui/icons-material/FormatItalic'
 import FormatUnderlinedIcon from '@mui/icons-material/FormatUnderlined'
 import StrikethroughSIcon from '@mui/icons-material/StrikethroughS'
 import CodeIcon from '@mui/icons-material/Code'
-import { Description, FolderOpen, AddLink, DragIndicator } from '@mui/icons-material'
-import { useState, useEffect } from 'react'
+import { Description, FolderOpen, AddLink, DragIndicator, ArrowUpward, ArrowDownward, DragHandle } from '@mui/icons-material'
+import { useState, useEffect, useRef } from 'react'
 
 interface Document {
   id: string
@@ -44,6 +44,9 @@ export function NovelEditorComponent({
   onChildClick,
 }: NovelEditorComponentProps) {
   const [editorInstance, setEditorInstance] = useState<any>(null)
+  const [blockMenuPosition, setBlockMenuPosition] = useState<{ top: number; left: number } | null>(null)
+  const [currentBlockPos, setCurrentBlockPos] = useState<number | null>(null)
+  const editorRef = useRef<HTMLDivElement>(null)
 
   // 子ドキュメントへのリンクをエディターに挿入
   const insertChildLink = (child: Document) => {
@@ -75,11 +78,166 @@ export function NovelEditorComponent({
       .run()
   }
 
+  // ブロックを上に移動
+  const moveBlockUp = () => {
+    if (!editorInstance || currentBlockPos === null) return
+
+    const { state, view } = editorInstance
+    const resolvedPos = state.doc.resolve(currentBlockPos)
+
+    // 現在のノードの開始位置と終了位置を取得
+    const nodeStart = currentBlockPos
+    const node = resolvedPos.nodeAfter || resolvedPos.parent
+    const nodeEnd = nodeStart + node.nodeSize
+
+    // 親ノードでのインデックスを確認
+    const parentDepth = resolvedPos.depth
+    const indexInParent = resolvedPos.index(parentDepth)
+
+    if (indexInParent === 0) {
+      // すでに一番上なので移動できない
+      return
+    }
+
+    // 上のノードを取得
+    const parent = resolvedPos.node(parentDepth)
+    const prevNode = parent.child(indexInParent - 1)
+    const prevStart = nodeStart - prevNode.nodeSize
+    const prevEnd = nodeStart
+
+    // トランザクションでノードを入れ替え
+    const tr = state.tr
+    const currentNodeContent = state.doc.slice(nodeStart, nodeEnd)
+    const prevNodeContent = state.doc.slice(prevStart, prevEnd)
+
+    tr.delete(prevStart, nodeEnd)
+    tr.insert(prevStart, currentNodeContent.content)
+    tr.insert(prevStart + node.nodeSize, prevNodeContent.content)
+
+    view.dispatch(tr)
+  }
+
+  // ブロックを下に移動
+  const moveBlockDown = () => {
+    if (!editorInstance || currentBlockPos === null) return
+
+    const { state, view } = editorInstance
+    const resolvedPos = state.doc.resolve(currentBlockPos)
+
+    // 現在のノードの開始位置と終了位置を取得
+    const nodeStart = currentBlockPos
+    const node = resolvedPos.nodeAfter || resolvedPos.parent
+    const nodeEnd = nodeStart + node.nodeSize
+
+    // 親ノードでのインデックスを確認
+    const parentDepth = resolvedPos.depth
+    const indexInParent = resolvedPos.index(parentDepth)
+    const parent = resolvedPos.node(parentDepth)
+
+    if (indexInParent >= parent.childCount - 1) {
+      // すでに一番下なので移動できない
+      return
+    }
+
+    // 下のノードを取得
+    const nextNode = parent.child(indexInParent + 1)
+    const nextStart = nodeEnd
+    const nextEnd = nextStart + nextNode.nodeSize
+
+    // トランザクションでノードを入れ替え
+    const tr = state.tr
+    const currentNodeContent = state.doc.slice(nodeStart, nodeEnd)
+    const nextNodeContent = state.doc.slice(nextStart, nextEnd)
+
+    tr.delete(nodeStart, nextEnd)
+    tr.insert(nodeStart, nextNodeContent.content)
+    tr.insert(nodeStart + nextNode.nodeSize, currentNodeContent.content)
+
+    view.dispatch(tr)
+  }
+
   // ドラッグ開始時のハンドラー
   const handleDragStart = (e: React.DragEvent, child: Document) => {
     e.dataTransfer.effectAllowed = 'copy'
     e.dataTransfer.setData('application/json', JSON.stringify(child))
   }
+
+  // カーソル位置が変わったときにブロックメニューを更新
+  useEffect(() => {
+    if (!editorInstance || !editorRef.current) return
+
+    const updateBlockMenu = () => {
+      const { state, view } = editorInstance
+      const { selection } = state
+
+      // テキストが選択されている場合はメニューを非表示
+      if (!selection.empty) {
+        setBlockMenuPosition(null)
+        setCurrentBlockPos(null)
+        return
+      }
+
+      const { $from } = selection
+
+      // カーソルがある位置のブロックノードを取得
+      let depth = $from.depth
+      let nodePos = $from.before(depth)
+      let node = $from.node(depth)
+
+      // ブロックレベルのノードを見つけるまで上に遡る
+      while (depth > 0 && node.isInline) {
+        depth--
+        nodePos = $from.before(depth)
+        node = $from.node(depth)
+      }
+
+      if (!node || node.type.name === 'doc') {
+        setBlockMenuPosition(null)
+        setCurrentBlockPos(null)
+        return
+      }
+
+      // DOMノードを取得してメニュー位置を計算
+      try {
+        const domNode = view.nodeDOM(nodePos) as HTMLElement
+        if (!domNode) {
+          setBlockMenuPosition(null)
+          setCurrentBlockPos(null)
+          return
+        }
+
+        const rect = domNode.getBoundingClientRect()
+        const editorRect = editorRef.current!.getBoundingClientRect()
+
+        setBlockMenuPosition({
+          top: rect.top - editorRect.top + rect.height / 2 - 40,
+          left: -60,
+        })
+
+        setCurrentBlockPos(nodePos)
+      } catch (error) {
+        console.error('Error getting DOM node:', error)
+        setBlockMenuPosition(null)
+        setCurrentBlockPos(null)
+      }
+    }
+
+    // 初期表示
+    updateBlockMenu()
+
+    // selectionUpdateとupdateイベントを監視
+    const handleUpdate = () => {
+      updateBlockMenu()
+    }
+
+    editorInstance.on('selectionUpdate', handleUpdate)
+    editorInstance.on('update', handleUpdate)
+
+    return () => {
+      editorInstance.off('selectionUpdate', handleUpdate)
+      editorInstance.off('update', handleUpdate)
+    }
+  }, [editorInstance])
 
   // グローバルクリックハンドラーで子ドキュメントリンクを処理
   useEffect(() => {
@@ -124,6 +282,8 @@ export function NovelEditorComponent({
       }}
     >
       <Box
+        ref={editorRef}
+        sx={{ position: 'relative' }}
         onDragOver={(e) => {
           e.preventDefault()
           e.dataTransfer.dropEffect = 'copy'
@@ -141,6 +301,69 @@ export function NovelEditorComponent({
           }
         }}
       >
+        {/* Block Move Menu */}
+        {blockMenuPosition && (
+          <Paper
+            elevation={4}
+            sx={{
+              position: 'absolute',
+              top: blockMenuPosition.top,
+              left: blockMenuPosition.left,
+              zIndex: 1000,
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 0.5,
+              p: 0.5,
+              borderRadius: 1,
+            }}
+          >
+            <Tooltip title="上に移動" placement="left" arrow>
+              <IconButton
+                size="small"
+                onClick={moveBlockUp}
+                sx={{
+                  '&:hover': {
+                    bgcolor: 'primary.light',
+                    color: 'primary.contrastText',
+                  },
+                }}
+              >
+                <ArrowUpward fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="下に移動" placement="left" arrow>
+              <IconButton
+                size="small"
+                onClick={moveBlockDown}
+                sx={{
+                  '&:hover': {
+                    bgcolor: 'primary.light',
+                    color: 'primary.contrastText',
+                  },
+                }}
+              >
+                <ArrowDownward fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Divider sx={{ my: 0.5 }} />
+            <Tooltip title="ドラッグして移動" placement="left" arrow>
+              <IconButton
+                size="small"
+                sx={{
+                  cursor: 'grab',
+                  '&:active': {
+                    cursor: 'grabbing',
+                  },
+                  '&:hover': {
+                    bgcolor: 'action.hover',
+                  },
+                }}
+              >
+                <DragHandle fontSize="small" />
+              </IconButton>
+            </Tooltip>
+          </Paper>
+        )}
         <EditorRoot>
           <EditorContent
             extensions={defaultExtensions}
