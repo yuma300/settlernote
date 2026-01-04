@@ -11,7 +11,6 @@ import {
   EditorBubbleItem,
   type JSONContent,
 } from 'novel'
-import { useEditor } from 'novel'
 import { defaultExtensions, suggestionItems } from './novel-extensions'
 import { Paper, IconButton, Divider, Tooltip, Box, Typography, Card, CardActionArea, Stack, Button } from '@mui/material'
 import FormatBoldIcon from '@mui/icons-material/FormatBold'
@@ -462,8 +461,10 @@ export function NovelEditorComponent({
               }}
             >
               <Box sx={{ p: 1 }}>
-                <EditorCommandEmpty sx={{ px: 2, py: 1, color: 'text.secondary' }}>
-                  コマンドが見つかりません
+                <EditorCommandEmpty>
+                  <Box sx={{ px: 2, py: 1, color: 'text.secondary' }}>
+                    コマンドが見つかりません
+                  </Box>
                 </EditorCommandEmpty>
                 <EditorCommandList>
                   {suggestionItems.map((item) => (

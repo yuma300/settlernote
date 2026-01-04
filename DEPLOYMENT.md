@@ -72,9 +72,23 @@ Cloudflareダッシュボード > SSL/TLS:
 
 推奨は "Flexible" モードでシンプルに開始することです。
 
-## 3. アプリケーションのデプロイ
+## 3. Docker Composeの構成について
 
-### 3.1 リポジトリのクローン
+このアプリケーションは、以下の3つのコンテナで構成されています：
+
+1. **MySQL**: データベース（ポート3306）
+2. **App**: Next.jsアプリケーション（ポート3000）
+3. **Nginx**: リバースプロキシ（ポート80）
+
+**重要**: Nginxはdocker-compose.ymlに含まれているため、**別途インストールや設定は不要**です。`docker-compose up`コマンドを実行すると、3つのコンテナすべてが自動的に起動します。
+
+```
+ブラウザ → Cloudflare (HTTPS) → VPS Nginx (HTTP) → Next.jsアプリ → MySQL
+```
+
+## 4. アプリケーションのデプロイ
+
+### 4.1 リポジトリのクローン
 
 ```bash
 # 作業ディレクトリを作成
@@ -89,7 +103,7 @@ cd settlernote
 # scp -r /path/to/settlernote root@your-vps-ip:/opt/apps/
 ```
 
-### 3.2 環境変数の設定
+### 4.2 環境変数の設定
 
 ```bash
 # .env.productionファイルを編集
@@ -122,7 +136,7 @@ GOOGLE_CLIENT_SECRET=<Google Cloud Consoleから取得>
 openssl rand -base64 32
 ```
 
-### 3.3 Google OAuth設定
+### 4.3 Google OAuth設定
 
 1. [Google Cloud Console](https://console.cloud.google.com/apis/credentials) にアクセス
 2. 新しいOAuth 2.0クライアントIDを作成
@@ -132,18 +146,25 @@ openssl rand -base64 32
    ```
 4. クライアントIDとシークレットを `.env.production` に設定
 
-## 4. アプリケーションの起動
+## 5. アプリケーションの起動
 
-### 4.1 Docker Composeで起動
+### 5.1 Docker Composeで起動
+
+この単一のコマンドで、MySQL、Next.jsアプリ、Nginxの**3つすべてのコンテナが自動的に起動**します。
 
 ```bash
 cd /opt/apps/settlernote
 
-# 環境変数を読み込んで起動
+# 環境変数を読み込んで起動（初回はイメージのビルドに数分かかります）
 docker-compose --env-file .env.production up -d
 ```
 
-### 4.2 データベースのマイグレーション
+起動後、以下のコンテナが動作します：
+- `settlernote-mysql`: MySQLデータベース
+- `settlernote-app`: Next.jsアプリケーション
+- `settlernote-nginx`: Nginxリバースプロキシ
+
+### 5.2 データベースのマイグレーション
 
 アプリケーションが起動すると、`docker-entrypoint.sh` が自動的にマイグレーションを実行します。
 
@@ -153,9 +174,9 @@ docker-compose --env-file .env.production up -d
 docker-compose exec app npx prisma migrate deploy
 ```
 
-## 5. 動作確認
+## 6. 動作確認
 
-### 5.1 コンテナの状態確認
+### 6.1 コンテナの状態確認
 
 ```bash
 docker-compose ps
@@ -163,7 +184,7 @@ docker-compose ps
 
 すべてのコンテナが `Up` 状態であることを確認してください。
 
-### 5.2 ログの確認
+### 6.2 ログの確認
 
 ```bash
 # アプリケーションログ
@@ -176,13 +197,13 @@ docker-compose logs -f nginx
 docker-compose logs -f mysql
 ```
 
-### 5.3 ブラウザでアクセス
+### 6.3 ブラウザでアクセス
 
 `https://notedev.settler.cc/` にアクセスして、アプリケーションが正常に動作することを確認してください。
 
 **注**: HTTPSはCloudflareが自動的に処理します。
 
-## 6. 運用コマンド
+## 7. 運用コマンド
 
 ### アプリケーションの起動
 
@@ -235,7 +256,7 @@ git pull
 docker-compose --env-file .env.production up -d --build
 ```
 
-## 7. トラブルシューティング
+## 8. トラブルシューティング
 
 ### アプリケーションが起動しない
 
@@ -270,7 +291,7 @@ docker-compose restart nginx
    - `.env.production`の`NEXTAUTH_URL`が`https://notedev.settler.cc`になっているか確認
    - Google Cloud ConsoleのリダイレクトURIが正しいか確認
 
-## 8. セキュリティ上の注意
+## 9. セキュリティ上の注意
 
 1. **パスワード管理**
    - `.env.production` ファイルは絶対にGitにコミットしない
@@ -293,7 +314,7 @@ docker-compose restart nginx
    - データベースの定期バックアップを設定
    - cronで自動バックアップを実行
 
-## 9. 自動バックアップの設定（推奨）
+## 10. 自動バックアップの設定（推奨）
 
 ```bash
 # バックアップスクリプトの作成
@@ -318,7 +339,7 @@ chmod +x /opt/apps/settlernote/backup.sh
 (crontab -l 2>/dev/null; echo "0 2 * * * /opt/apps/settlernote/backup.sh") | crontab -
 ```
 
-## 10. Cloudflareの追加機能（オプション）
+## 11. Cloudflareの追加機能（オプション）
 
 Cloudflareダッシュボードから以下の機能を有効化できます:
 
@@ -327,7 +348,7 @@ Cloudflareダッシュボードから以下の機能を有効化できます:
 - **Web Application Firewall (WAF)**: 高度なセキュリティ保護
 - **Analytics**: アクセス解析
 
-## 11. 監視とアラート（オプション）
+## 12. 監視とアラート（オプション）
 
 本番環境では、以下のような監視ツールの導入を検討してください:
 

@@ -33,15 +33,18 @@ RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
 # Copy necessary files
+RUN mkdir -p ./public
 COPY --from=builder /app/public ./public
+# For standalone mode, we need to copy the standalone output
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+
+# Copy full node_modules for Prisma (standalone doesn't include all deps)
+COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 
 # Copy start script
-COPY docker-entrypoint.sh ./
-RUN chmod +x docker-entrypoint.sh
+COPY --chmod=755 docker-entrypoint.sh ./
 
 USER nextjs
 

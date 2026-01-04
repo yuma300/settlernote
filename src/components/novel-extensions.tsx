@@ -10,7 +10,6 @@ import {
   renderItems,
   TiptapUnderline,
 } from 'novel'
-import Heading from '@tiptap/extension-heading'
 
 // Suggestion items for slash commands
 export const suggestionItems = [
@@ -152,35 +151,9 @@ export const suggestionItems = [
   },
 ]
 
-// 見出しにIDを付与するカスタムHeading拡張
-const CustomHeading = Heading.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      id: {
-        default: null,
-        parseHTML: (element) => element.getAttribute('id'),
-        renderHTML: (attributes) => {
-          if (!attributes.id) {
-            return {}
-          }
-          return {
-            id: attributes.id,
-          }
-        },
-      },
-    }
-  },
-})
-
 // デフォルトの拡張機能セット
-export const defaultExtensions = [
-  StarterKit.configure({
-    heading: false, // StarterKitのHeadingを無効化
-  }),
-  CustomHeading.configure({
-    levels: [1, 2, 3, 4, 5, 6],
-  }),
+export const defaultExtensions: any = [
+  StarterKit,
   Placeholder,
   TiptapLink,
   TiptapUnderline,
