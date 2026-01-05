@@ -44,7 +44,8 @@ COPY --from=builder /app/node_modules ./node_modules
 COPY --from=builder /app/prisma ./prisma
 
 # Copy start script
-COPY --chmod=755 docker-entrypoint.sh ./
+COPY docker-entrypoint.sh ./
+RUN chmod +x docker-entrypoint.sh && chown nextjs:nodejs docker-entrypoint.sh
 
 USER nextjs
 

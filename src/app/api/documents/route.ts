@@ -23,22 +23,10 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const parentId = searchParams.get('parentId')
 
-    // Get documents owned by user or shared with user
+    // Get all documents (visible to all logged-in users)
     const documents = await prisma.document.findMany({
       where: {
         AND: [
-          {
-            OR: [
-              { ownerId: user.id },
-              {
-                permissions: {
-                  some: {
-                    userId: user.id,
-                  },
-                },
-              },
-            ],
-          },
           {
             isArchived: false,
           },
