@@ -46,6 +46,9 @@ COPY --from=builder /app/prisma ./prisma
 # Copy start script
 COPY --chmod=755 docker-entrypoint.sh ./
 
+# Change ownership of all files to nextjs user
+RUN chown -R nextjs:nodejs /app
+
 USER nextjs
 
 EXPOSE 3000
