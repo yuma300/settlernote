@@ -24,19 +24,10 @@ export async function GET(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    // Get document (visible to all logged-in users)
     const document = await prisma.document.findFirst({
       where: {
         id,
-        OR: [
-          { ownerId: user.id },
-          {
-            permissions: {
-              some: {
-                userId: user.id,
-              },
-            },
-          },
-        ],
       },
       include: {
         owner: {

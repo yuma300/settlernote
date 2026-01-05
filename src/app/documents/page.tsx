@@ -59,6 +59,7 @@ export default function DocumentsPage() {
   const [autoSaving, setAutoSaving] = useState(false)
   const [lastSaved, setLastSaved] = useState<Date | null>(null)
   const [isInitialLoad, setIsInitialLoad] = useState(true)
+  const [hasUserEdited, setHasUserEdited] = useState(false)
   const [showToc, setShowToc] = useState(false)
 
   // Redirect if not authenticated
@@ -97,6 +98,7 @@ export default function DocumentsPage() {
         const data = await response.json()
         setCurrentDoc(data)
         setIsInitialLoad(true) // 新しいドキュメントを読み込んだ時はフラグをリセット
+        setHasUserEdited(false) // ユーザー編集フラグをリセット
         setLastSaved(null) // 保存ステータスをリセット
       }
     } catch (error) {
@@ -121,6 +123,7 @@ export default function DocumentsPage() {
         await fetchDocuments()
         setCurrentDoc(newDoc)
         setIsInitialLoad(true) // 新規ドキュメント作成時もフラグをリセット
+        setHasUserEdited(false) // ユーザー編集フラグをリセット
         setLastSaved(null) // 保存ステータスをリセット
       }
     } catch (error) {
@@ -184,6 +187,11 @@ export default function DocumentsPage() {
       return
     }
 
+    // ユーザーが編集していない場合は保存しない
+    if (!hasUserEdited) {
+      return
+    }
+
     setAutoSaving(true)
     const autoSaveTimer = setTimeout(async () => {
       try {
@@ -214,7 +222,7 @@ export default function DocumentsPage() {
       clearTimeout(autoSaveTimer)
       setAutoSaving(false)
     }
-  }, [currentDoc?.title, currentDoc?.content, currentDoc?.icon, currentDoc?.id, isInitialLoad])
+  }, [currentDoc?.title, currentDoc?.content, currentDoc?.icon, currentDoc?.id, isInitialLoad, hasUserEdited])
 
   if (status === 'loading' || loading) {
     return (
@@ -267,6 +275,7 @@ export default function DocumentsPage() {
                       <EmojiPicker
                         onEmojiClick={(emojiData) => {
                           setCurrentDoc({ ...currentDoc, icon: emojiData.emoji })
+                          setHasUserEdited(true)
                           setShowEmojiPicker(false)
                         }}
                       />
@@ -277,9 +286,10 @@ export default function DocumentsPage() {
                   fullWidth
                   variant="standard"
                   value={currentDoc.title}
-                  onChange={(e) =>
+                  onChange={(e) => {
                     setCurrentDoc({ ...currentDoc, title: e.target.value })
-                  }
+                    setHasUserEdited(true)
+                  }}
                   placeholder="Untitled"
                   sx={{
                     '& .MuiInputBase-input': {
@@ -358,9 +368,10 @@ export default function DocumentsPage() {
               <NovelEditorComponent
                 key={currentDoc.id}
                 content={currentDoc.content}
-                onChange={(content) =>
+                onChange={(content) => {
                   setCurrentDoc({ ...currentDoc, content })
-                }
+                  setHasUserEdited(true)
+                }}
                 children={currentDoc.children}
                 onChildClick={fetchDocument}
               />
