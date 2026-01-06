@@ -1,0 +1,67 @@
+services:
+  mysql:
+    image: mysql:8.0
+    container_name: settlernote-mysql-dev
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-root_password}
+      MYSQL_DATABASE: ${MYSQL_DATABASE:-settlernote}
+      MYSQL_USER: ${MYSQL_USER:-settlernote_user}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD:-settlernote_password}
+    ports:
+      - "3306:3306"
+    volumes:
+      - mysql_data_dev:/var/lib/mysql
+    command: --default-authentication-plugin=mysql_native_password
+    networks:
+      - settlernote-network
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      timeout: 20s
+      retries: 10
+
+  app:
+    image: node:20-alpine
+    container_name: settlernote-app-dev
+    working_dir: /app
+    restart: always
+    environment:
+      - NODE_ENV=development
+      - DATABASE_URL=${DATABASE_URL}
+      - NEXTAUTH_URL=${NEXTAUTH_URL}
+      - NEXTAUTH_SECRET=${NEXTAUTH_SECRET}
+      - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    depends_on:
+      mysql:
+        condition: service_healthy
+    networks:
+      - settlernote-network
+    ports:
+      - "3102:3102"
+    command: sh -c "npm install && npx prisma generate && npx prisma migrate deploy && npm run dev"
+
+  nginx:
+    image: nginx:alpine
+    container_name: settlernote-nginx-dev
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - app
+    networks:
+      - settlernote-network
+
+volumes:
+  mysql_data_dev:
+
+networks:
+  settlernote-network:
+    driver: bridge

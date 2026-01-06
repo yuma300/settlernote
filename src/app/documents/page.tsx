@@ -17,8 +17,12 @@ import {
   ListItemIcon,
   ListItemText,
   Divider as MuiDivider,
+  AppBar,
+  Toolbar,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
-import { Save, Share, Delete, EmojiEmotions, Description, FolderOpen, Toc } from '@mui/icons-material'
+import { Save, Share, Delete, EmojiEmotions, Description, FolderOpen, Toc, Menu as MenuIcon } from '@mui/icons-material'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import { Sidebar } from '@/components/Sidebar'
@@ -51,6 +55,8 @@ interface Document {
 export default function DocumentsPage() {
   const { data: session, status } = useSession()
   const router = useRouter()
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [documents, setDocuments] = useState<Document[]>([])
   const [currentDoc, setCurrentDoc] = useState<Document | null>(null)
   const [loading, setLoading] = useState(true)
@@ -61,6 +67,7 @@ export default function DocumentsPage() {
   const [isInitialLoad, setIsInitialLoad] = useState(true)
   const [hasUserEdited, setHasUserEdited] = useState(false)
   const [showToc, setShowToc] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
 
   // Redirect if not authenticated
   useEffect(() => {
@@ -207,6 +214,8 @@ export default function DocumentsPage() {
 
         if (response.ok) {
           setLastSaved(new Date())
+          // ドキュメントリストを更新してタイトル変更を反映
+          await fetchDocuments()
           console.log('Auto-saved successfully')
         } else {
           console.error('Auto-save failed:', response.status)
@@ -222,7 +231,7 @@ export default function DocumentsPage() {
       clearTimeout(autoSaveTimer)
       setAutoSaving(false)
     }
-  }, [currentDoc?.title, currentDoc?.content, currentDoc?.icon, currentDoc?.id, isInitialLoad, hasUserEdited])
+  }, [currentDoc?.title, currentDoc?.content, currentDoc?.icon, currentDoc?.id, isInitialLoad, hasUserEdited, fetchDocuments])
 
   if (status === 'loading' || loading) {
     return (
@@ -241,12 +250,33 @@ export default function DocumentsPage() {
 
   return (
     <Box sx={{ display: 'flex', height: '100vh' }}>
+      {/* Mobile App Bar */}
+      {isMobile && (
+        <AppBar position="fixed" sx={{ zIndex: (theme) => theme.zIndex.drawer + 1 }}>
+          <Toolbar>
+            <IconButton
+              color="inherit"
+              edge="start"
+              onClick={() => setSidebarOpen(true)}
+              sx={{ mr: 2 }}
+            >
+              <MenuIcon />
+            </IconButton>
+            <Typography variant="h6" noWrap component="div">
+              SettlerNote
+            </Typography>
+          </Toolbar>
+        </AppBar>
+      )}
+
       <Sidebar
         documents={documents}
         currentDocId={currentDoc?.id}
         onDocumentSelect={fetchDocument}
         onCreateDocument={handleCreateDocument}
         onRefresh={fetchDocuments}
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
       />
 
       <Box
@@ -256,6 +286,7 @@ export default function DocumentsPage() {
           p: 3,
           overflow: 'auto',
           bgcolor: 'background.default',
+          ...(isMobile && { mt: 7 }), // Add margin top for mobile app bar
         }}
       >
         {currentDoc ? (

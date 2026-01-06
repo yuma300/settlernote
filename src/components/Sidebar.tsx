@@ -17,6 +17,8 @@ import {
   MenuItem,
   Divider,
   Button,
+  useMediaQuery,
+  useTheme,
 } from '@mui/material'
 import {
   ExpandMore,
@@ -25,6 +27,7 @@ import {
   Description,
   Settings,
   Logout,
+  Menu as MenuIcon,
 } from '@mui/icons-material'
 import { useSession, signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
@@ -44,6 +47,8 @@ interface SidebarProps {
   onDocumentSelect: (docId: string) => void
   onCreateDocument: (parentId?: string) => void
   onRefresh: () => void
+  open: boolean
+  onClose: () => void
 }
 
 function DocumentTreeItem({
@@ -137,9 +142,13 @@ export function Sidebar({
   onDocumentSelect,
   onCreateDocument,
   onRefresh,
+  open,
+  onClose,
 }: SidebarProps) {
   const { data: session } = useSession()
   const router = useRouter()
+  const theme = useTheme()
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'))
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null)
 
   const handleUserMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
@@ -154,18 +163,15 @@ export function Sidebar({
     signOut({ callbackUrl: '/' })
   }
 
-  return (
-    <Drawer
-      variant="permanent"
-      sx={{
-        width: DRAWER_WIDTH,
-        flexShrink: 0,
-        '& .MuiDrawer-paper': {
-          width: DRAWER_WIDTH,
-          boxSizing: 'border-box',
-        },
-      }}
-    >
+  const handleDocumentSelect = (docId: string) => {
+    onDocumentSelect(docId)
+    if (isMobile) {
+      onClose()
+    }
+  }
+
+  const drawerContent = (
+    <>
       <Box sx={{ p: 2, display: 'flex', alignItems: 'center', gap: 2 }}>
         <Typography variant="h6" component="h1" sx={{ flexGrow: 1 }}>
           SettlerNote
@@ -235,7 +241,7 @@ export function Sidebar({
               key={doc.id}
               document={doc}
               currentDocId={currentDocId}
-              onSelect={onDocumentSelect}
+              onSelect={handleDocumentSelect}
               onCreate={onCreateDocument}
             />
           ))}
@@ -255,6 +261,45 @@ export function Sidebar({
           ユーザー設定
         </Button>
       </Box>
-    </Drawer>
+    </>
+  )
+
+  return (
+    <>
+      {/* Mobile: Temporary Drawer */}
+      {isMobile ? (
+        <Drawer
+          variant="temporary"
+          open={open}
+          onClose={onClose}
+          ModalProps={{
+            keepMounted: true, // Better mobile performance
+          }}
+          sx={{
+            '& .MuiDrawer-paper': {
+              width: DRAWER_WIDTH,
+              boxSizing: 'border-box',
+            },
+          }}
+        >
+          {drawerContent}
+        </Drawer>
+      ) : (
+        /* Desktop: Permanent Drawer */
+        <Drawer
+          variant="permanent"
+          sx={{
+            width: DRAWER_WIDTH,
+            flexShrink: 0,
+            '& .MuiDrawer-paper': {
+              width: DRAWER_WIDTH,
+              boxSizing: 'border-box',
+            },
+          }}
+        >
+          {drawerContent}
+        </Drawer>
+      )}
+    </>
   )
 }
