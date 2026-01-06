@@ -76,8 +76,8 @@ model Document {
   position    Int      @default(0)
 
   // Ownership and visibility
-  ownerId     String
-  owner       User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  ownerId     String?
+  owner       User?    @relation(fields: [ownerId], references: [id], onDelete: SetNull)
 
   isPublished Boolean  @default(false)
   isArchived  Boolean  @default(false)
