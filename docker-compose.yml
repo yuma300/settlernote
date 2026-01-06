@@ -39,7 +39,7 @@ services:
     networks:
       - settlernote-network
     ports:
-      - "3103:3000"
+      - "3103:3102"
 
   nginx:
     image: nginx:alpine

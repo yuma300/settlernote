@@ -107,6 +107,8 @@ export default function SettingsPage() {
         onDocumentSelect={(docId) => router.push(`/documents?id=${docId}`)}
         onCreateDocument={() => router.push('/documents')}
         onRefresh={fetchDocuments}
+        open={true}
+        onClose={() => {}}
       />
       <Box component="main" sx={{ flexGrow: 1, p: 3, overflow: 'auto' }}>
         <Container maxWidth="md">
