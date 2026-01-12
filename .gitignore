@@ -10,6 +10,10 @@
 /.next/
 /out/
 
+
+# generated data
+/public/media/
+
 # production
 /build
 

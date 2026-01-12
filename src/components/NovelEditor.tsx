@@ -20,6 +20,7 @@ import StrikethroughSIcon from '@mui/icons-material/StrikethroughS'
 import CodeIcon from '@mui/icons-material/Code'
 import { Description, FolderOpen, AddLink, DragIndicator, ArrowUpward, ArrowDownward, DragHandle } from '@mui/icons-material'
 import { useState, useEffect, useRef } from 'react'
+import ImagePickerDialog from './ImagePickerDialog'
 
 interface Document {
   id: string
@@ -45,7 +46,113 @@ export function NovelEditorComponent({
   const [editorInstance, setEditorInstance] = useState<any>(null)
   const [blockMenuPosition, setBlockMenuPosition] = useState<{ top: number; left: number } | null>(null)
   const [currentBlockPos, setCurrentBlockPos] = useState<number | null>(null)
+  const [imagePickerOpen, setImagePickerOpen] = useState(false)
   const editorRef = useRef<HTMLDivElement>(null)
+
+  // 画像アップロード関数
+  const uploadImage = async (file: File): Promise<string> => {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch('/api/upload', {
+      method: 'POST',
+      body: formData,
+    })
+
+    if (!response.ok) {
+      const error = await response.json()
+      throw new Error(error.error || 'Upload failed')
+    }
+
+    const data = await response.json()
+    return data.url
+  }
+
+  // 画像選択ダイアログを開く関数をエディタに公開
+  const openImagePicker = () => {
+    setImagePickerOpen(true)
+  }
+
+  // 画像を挿入する関数
+  const insertImage = (url: string) => {
+    if (!editorInstance) return
+    editorInstance.chain().focus().setImage({ src: url }).run()
+  }
+
+  // 画像を貼り付けた時の処理
+  const handlePaste = async (e: ClipboardEvent) => {
+    if (!editorInstance) return
+
+    const items = e.clipboardData?.items
+    if (!items) return
+
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i]
+
+      if (item.type.indexOf('image') !== -1) {
+        e.preventDefault()
+
+        const file = item.getAsFile()
+        if (!file) continue
+
+        try {
+          // 一時的なプレースホルダーを挿入
+          editorInstance.chain().focus().setImage({ src: '' }).run()
+
+          // 画像をアップロード
+          const url = await uploadImage(file)
+
+          // プレースホルダーを実際の画像URLに置き換え
+          editorInstance.chain().focus().setImage({ src: url }).run()
+        } catch (error) {
+          console.error('Image upload failed:', error)
+          alert('画像のアップロードに失敗しました')
+        }
+      }
+    }
+  }
+
+  // ドラッグ&ドロップで画像を追加
+  const handleDrop = async (e: DragEvent) => {
+    if (!editorInstance) return
+
+    const files = e.dataTransfer?.files
+    if (!files || files.length === 0) return
+
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+
+      if (file.type.indexOf('image') !== -1) {
+        e.preventDefault()
+        e.stopPropagation()
+
+        try {
+          // 画像をアップロード
+          const url = await uploadImage(file)
+
+          // エディタに画像を挿入
+          editorInstance.chain().focus().setImage({ src: url }).run()
+        } catch (error) {
+          console.error('Image upload failed:', error)
+          alert('画像のアップロードに失敗しました')
+        }
+      }
+    }
+  }
+
+  // 貼り付けイベントを監視
+  useEffect(() => {
+    const editorElement = editorRef.current
+    if (!editorElement) return
+
+    editorElement.addEventListener('paste', handlePaste as any)
+    editorElement.addEventListener('drop', handleDrop as any)
+
+    return () => {
+      editorElement.removeEventListener('paste', handlePaste as any)
+      editorElement.removeEventListener('drop', handleDrop as any)
+    }
+  }, [editorInstance])
 
   // 子ドキュメントへのリンクをエディターに挿入
   const insertChildLink = (child: Document) => {
@@ -266,6 +373,18 @@ export function NovelEditorComponent({
       document.removeEventListener('click', handleClick, true)
     }
   }, [onChildClick])
+
+  // 画像選択ダイアログを開くカスタムイベントリスナー
+  useEffect(() => {
+    const handleOpenImagePicker = () => {
+      setImagePickerOpen(true)
+    }
+
+    window.addEventListener('openImagePicker', handleOpenImagePicker)
+    return () => {
+      window.removeEventListener('openImagePicker', handleOpenImagePicker)
+    }
+  }, [])
 
   return (
     <Paper
@@ -592,6 +711,13 @@ export function NovelEditorComponent({
           </Box>
         </Box>
       )}
+
+      {/* 画像選択ダイアログ */}
+      <ImagePickerDialog
+        open={imagePickerOpen}
+        onClose={() => setImagePickerOpen(false)}
+        onSelectImage={insertImage}
+      />
     </Paper>
   )
 }

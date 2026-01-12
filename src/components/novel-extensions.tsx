@@ -149,6 +149,19 @@ export const suggestionItems = [
         .run()
     },
   },
+  {
+    title: '画像',
+    description: '画像を挿入',
+    searchTerms: ['image', 'img', 'picture', '画像'],
+    icon: <span>🖼️</span>,
+    command: ({ editor, range }: any) => {
+      editor.chain().focus().deleteRange(range).run()
+
+      // カスタムイベントを発火して画像選択ダイアログを開く
+      const event = new CustomEvent('openImagePicker')
+      window.dispatchEvent(event)
+    },
+  },
 ]
 
 // デフォルトの拡張機能セット
