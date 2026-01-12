@@ -1,9 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { writeFile } from 'fs/promises'
+import { writeFile, mkdir } from 'fs/promises'
 import { join } from 'path'
 import crypto from 'crypto'
+import { existsSync } from 'fs'
 
 export async function POST(request: NextRequest) {
   try {
@@ -40,8 +41,14 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split('.').pop()
     const filename = `${hash}.${ext}`
 
+    // Ensure public/media directory exists
+    const mediaDir = join(process.cwd(), 'public', 'media')
+    if (!existsSync(mediaDir)) {
+      await mkdir(mediaDir, { recursive: true })
+    }
+
     // Save file to public/media directory
-    const publicPath = join(process.cwd(), 'public', 'media', filename)
+    const publicPath = join(mediaDir, filename)
     await writeFile(publicPath, buffer)
 
     // Return public URL
