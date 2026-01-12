@@ -12,7 +12,8 @@
 /backups/
 
 # generated data
-/public/media/
+/public/media/*
+!/public/media/.gitkeep
 
 # production
 /build
