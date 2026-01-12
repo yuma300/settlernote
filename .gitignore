@@ -9,7 +9,7 @@
 # next.js
 /.next/
 /out/
-
+/backups/
 
 # generated data
 /public/media/
@@ -46,6 +46,9 @@ prisma/*.db-journal
 # IDE
 .vscode
 .idea
+
+# rclone
+rclone-config/service-account.json
 
 # Docker volumes
 mysql_data

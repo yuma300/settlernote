@@ -1,0 +1,5 @@
+[gdrive]
+type = drive
+scope = drive
+service_account_file = /app/.config/rclone/service-account.json
+team_drive =
