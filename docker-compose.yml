@@ -13,8 +13,6 @@ services:
     volumes:
       - mysql_data:/var/lib/mysql
     command: --default-authentication-plugin=mysql_native_password
-    networks:
-      - settlernote-network
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
       timeout: 20s
@@ -38,29 +36,10 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
-    networks:
-      - settlernote-network
     ports:
-      - "3103:3000"
-
-  nginx:
-    image: nginx:alpine
-    container_name: settlernote-nginx
-    restart: always
-    ports:
-      - "80:80"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/conf.d:/etc/nginx/conf.d:ro
-      - ./public/media:/usr/share/nginx/html/media:ro
-    depends_on:
-      - app
-    networks:
-      - settlernote-network
+      - "127.0.0.1:3103:3102"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   mysql_data:
-
-networks:
-  settlernote-network:
-    driver: bridge
