@@ -104,7 +104,7 @@ export default function SettingsPage() {
     <Box sx={{ display: 'flex', height: '100vh' }}>
       <Sidebar
         documents={documents}
-        onDocumentSelect={(docId) => router.push(`/documents?id=${docId}`)}
+        onDocumentSelect={(docId) => router.push(`/documents/${docId}`)}
         onCreateDocument={() => router.push('/documents')}
         onRefresh={fetchDocuments}
         open={true}
