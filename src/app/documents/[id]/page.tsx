@@ -72,6 +72,7 @@ export default function DocumentPage() {
     }
   }, [status, router])
 
+
   // Fetch documents list
   const fetchDocuments = useCallback(async () => {
     try {

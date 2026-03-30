@@ -99,31 +99,13 @@ export async function PATCH(
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check if user has edit permission
-    const document = await prisma.document.findFirst({
-      where: {
-        id,
-        OR: [
-          { ownerId: user.id },
-          {
-            permissions: {
-              some: {
-                userId: user.id,
-                role: {
-                  in: ['OWNER', 'EDITOR'],
-                },
-              },
-            },
-          },
-        ],
-      },
+    // Any authenticated user can edit any document
+    const document = await prisma.document.findUnique({
+      where: { id },
     })
 
     if (!document) {
-      return NextResponse.json(
-        { error: 'Document not found or insufficient permissions' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Document not found' }, { status: 404 })
     }
 
     const body = await request.json()
